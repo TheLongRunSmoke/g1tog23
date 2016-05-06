@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 #    Copyright 2013 Frank Tkalcevic (frank@franksworkshop.com.au)
+#    Copyright 2016 Alexey Hohlov (root@amper.me)
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -18,6 +19,8 @@
 
 # Version 1.1
 # 	- Fix problem not picking up F word
+# Version 1.2
+# 	- Adding E argument and calculation for E, ignoring not changed positions
 
 import fileinput
 import sys
@@ -39,6 +42,13 @@ def output_line( s ):
             myfile.write(s + "\n")
 
 class gcode(object):
+    prevx = 0
+    prevy = 0
+    prevz = 0
+    preva = 0
+    prevf = 0
+    preve = 0
+
     def __init__(self):
         self.regMatch = {}
         self.line_count = 0
@@ -65,6 +75,7 @@ class gcode(object):
         lastz = 0
         lasta = 0
         lastf = 0
+        laste = 0
         self.line_count = 0
         self.output_line_count = 0
 
@@ -97,6 +108,12 @@ class gcode(object):
                 z = self.getCodeFloat(line, 'Z')
                 a = self.getCodeFloat(line, 'A')
                 f = self.getCodeFloat(line, 'F')
+                e = self.getCodeFloat(line, 'E')
+
+                if x is None and y is None and e is not None:
+                  if len(line) > 0 and len(st) > 0:
+                    self.simplifyPath(st)
+                    st = []
 
                 if x is None: 
                     x = lastx
@@ -108,23 +125,31 @@ class gcode(object):
                     a = lasta
                 if f is None: 
                     f = lastf
+                if e is None: 
+                    e = laste
 
-                st.append( [x,y,z,a,f] )
+                st.append( [x,y,z,a,f,e] )
 
                 lastx = x
                 lasty = y
                 lastz = z
                 lasta = a
                 lastf = f
+                laste = e
             else:
                 # any other move signifies the end of a list of line segments,
                 # so we simplify them.
+
+                if G == 92:
+                    laste = self.getCodeFloat(line, 'E')
+                    self.preve = laste
 
                 if G == 0:    #Rapid - remember position
                     x = self.getCodeFloat(line, 'X')
                     y = self.getCodeFloat(line, 'Y')
                     z = self.getCodeFloat(line, 'Z')
                     a = self.getCodeFloat(line, 'A')
+                    f = self.getCodeFloat(line, 'F')
 
                     if x is not None: 
                         lastx = x
@@ -134,6 +159,8 @@ class gcode(object):
                         lastz = z 
                     if a is not None: 
                         lasta = a
+                    if f is not None:
+                        lastf = f
 
                 if len(line) > 0 and len(st) > 0:
                     self.simplifyPath(st)
@@ -184,15 +211,29 @@ class gcode(object):
             #print "i, g,p,c=", i, g,p,c
             s = g + " "
             if p[0] is not None:
-                s = s + "X{0:f}".format(p[0]) + " "
+                if p[0] is not self.prevx:
+                  s = s + "X{0:.3f}".format(p[0]) + " "
+                  self.prevx = p[0]
             if p[1] is not None:
-                s = s + "Y{0:f}".format(p[1]) + " "
+                if p[1] is not self.prevy:
+                  s = s + "Y{0:.3f}".format(p[1]) + " "
+                  self.prevy = p[1]
             if p[2] is not None:
-                s = s + "Z{0:f}".format(p[2]) + " "
+                if p[2] != self.prevz:
+                  s = s + "Z{0:.3f}".format(p[2]) + " "
+                  self.prevz = p[2]
             if p[3] is not None:
-                s = s + "A{0:f}".format(p[3]) + " "
+              if p[3] is not self.preva:
+                  s = s + "A{0:.3f}".format(p[3]) + " "
+                  self.preva = p[3]
+            if p[5] is not None:
+              if p[5] is not self.preve:
+                  s = s + "E{0:.5f}".format(p[5]) + " "
+                  self.preve = p[5]
             if p[4] is not None:
-                s = s + "F{0:f}".format(p[4]) + " "
+                if p[4] is not self.prevf:
+                    s = s + "F{0:.3f}".format(p[4]) + " "
+                    self.prevf = p[4]
             if c is not None:
                 s = s + c
             s = s.rstrip()

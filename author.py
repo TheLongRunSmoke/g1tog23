@@ -29,9 +29,9 @@ def log(*args, **kwargs):
 
 def dist_lseg(l1, l2, p):
     "Compute the 3D distance from the line segment l1..l2 to the point p."
-    x0, y0, z0, a0, f0 = l1
-    xa, ya, za, aa, fa = l2
-    xi, yi, zi, ai, fi = p
+    x0, y0, z0, a0, f0, e0 = l1
+    xa, ya, za, aa, fa, ea = l2
+    xi, yi, zi, ai, fi, ei = p
 
     dx = xa-x0
     dy = ya-y0
@@ -101,9 +101,9 @@ def cent1(x1,y1,x2,y2,x3,y3):
     return Pc.x, Pc.y
 
 def arc_center(plane, p1, p2, p3):
-    x1, y1, z1, a1, f1 = p1
-    x2, y2, z2, a2, f2 = p2
-    x3, y3, z3, a3, f3 = p3
+    x1, y1, z1, a1, f1, e1 = p1
+    x2, y2, z2, a2, f2, e2 = p2
+    x3, y3, z3, a3, f3, e3 = p3
     
     if plane == 17: return cent1(x1,y1,x2,y2,x3,y3)
     if plane == 18: return cent1(x1,z1,x2,z2,x3,z3)
@@ -112,16 +112,16 @@ def arc_center(plane, p1, p2, p3):
 def arc_rad(plane, P1, P2, P3):
     if plane is None: return sys.maxint
 
-    x1, y1, z1, a1, f1 = P1
-    x2, y2, z2, a2, f2 = P2
-    x3, y3, z3, a3, f3 = P3
+    x1, y1, z1, a1, f1, e1 = P1
+    x2, y2, z2, a2, f2, e2 = P2
+    x3, y3, z3, a3, f3, e3 = P3
     
     if plane == 17: return rad1(x1,y1,x2,y2,x3,y3)
     if plane == 18: return rad1(x1,z1,x2,z2,x3,z3)
     if plane == 19: return rad1(y1,z1,y2,z2,y3,z3)
     return None, 0
 
-def get_pts(plane, (x,y,z,a,f)):
+def get_pts(plane, (x,y,z,a,f,e)):
     if plane == 17: return x,y
     if plane == 18: return x,z
     if plane == 19: return y,z
@@ -255,7 +255,7 @@ def chord_length(plane, c, p1, p2, p3):
     return angle * r
 
 def arc_fmt(plane, c1, c2, p1):
-    x, y, z, a, f = p1
+    x, y, z, a, f, e = p1
     if plane == 17: return "I%.4f J%.4f" % (c1-x, c2-y)
     if plane == 18: return "I%.4f K%.4f" % (c1-x, c2-z)
     if plane == 19: return "J%.4f K%.4f" % (c1-y, c2-z)
@@ -336,11 +336,11 @@ be specified only when there is only movement on 2 axes
         if min_rad != sys.maxint:
             c1, c2 = arc_center(plane, ps, path[max_arc], pe)
             log( ";arc center", c1, c2 )
-            lx, ly, lz, la, lf = path[0]
+            lx, ly, lz, la, lf, le = path[0]
             is_one_quadrant = one_quadrant(plane, (c1, c2), ps, path[max_arc], pe)
             log( ";is_one_quadrant=", is_one_quadrant )
             if True: #is_one_quadrant:
-                for i, (x,y,z,a,f) in enumerate(path):
+                for i, (x,y,z,a,f,e) in enumerate(path):
                     if plane == 17: dist = abs(math.hypot(c1-x, c2-y) - min_rad)
                     elif plane == 18: dist = abs(math.hypot(c1-x, c2-z) - min_rad)
                     elif plane == 19: dist = abs(math.hypot(c1-y, c2-z) - min_rad)
