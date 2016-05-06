@@ -110,7 +110,7 @@ class gcode(object):
                 f = self.getCodeFloat(line, 'F')
                 e = self.getCodeFloat(line, 'E')
 
-                if x is None and y is None and e is not None:
+                if x is None and y is None and e is not None or f is not None:
                   if len(line) > 0 and len(st) > 0:
                     self.simplifyPath(st)
                     st = []
