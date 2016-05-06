@@ -1,0 +1,1 @@
+c:\python\Python26\python.exe d:\3dprinting\g1tog23.py %*
