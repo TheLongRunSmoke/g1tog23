@@ -1,5 +1,7 @@
 .idea/
 build/
 __pycache__/
+dist/
 *.gcode
 *.bak
+*.spec
