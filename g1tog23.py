@@ -2,6 +2,7 @@
 
 #    Copyright 2013 Frank Tkalcevic (frank@franksworkshop.com.au)
 #    Copyright 2016 Alexey Hohlov (root@amper.me)
+#    Copyright 2017 thelongrunsmoke (thelongrunsmoke@gmail.com)
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -21,6 +22,8 @@
 # 	- Fix problem not picking up F word
 # Version 1.2
 # 	- Adding E argument and calculation for E, ignoring not changed positions
+# Version 1.3
+# 	- Migerate to py3.x
 
 import fileinput
 import sys
@@ -28,20 +31,22 @@ import re
 import os
 from author import douglas
 
-plane=17
-point_tolerance=0.05
-length_tolerance=0.005
+plane = 17
+point_tolerance = 0.05
+length_tolerance = 0.005
 
 output_file = ""
 
-def output_line( s ):
+
+def output_line(s):
     if output_file == "":
-        print s
+        print(s)
     else:
         with open(output_file, "a") as myfile:
             myfile.write(s + "\n")
 
-class gcode(object):
+
+class Gcode(object):
     prevx = 0
     prevy = 0
     prevz = 0
@@ -53,7 +58,7 @@ class gcode(object):
         self.regMatch = {}
         self.line_count = 0
         self.output_line_count = 0
-
+        self._fileSize = None
 
     def load(self, filename):
         if os.path.isfile(filename):
@@ -62,12 +67,10 @@ class gcode(object):
             self._load(gcodeFile)
             gcodeFile.close()
 
-
-    def loadList(self, l):
+    def load_list(self, l):
         self._load(l)
 
-
-    def _load(self, gcodeFile):
+    def _load(self, gcode_file):
 
         st = []
         lastx = 0
@@ -79,8 +82,7 @@ class gcode(object):
         self.line_count = 0
         self.output_line_count = 0
 
-
-        for line in gcodeFile:
+        for line in gcode_file:
 
             self.line_count = self.line_count + 1
             line = line.rstrip()
@@ -97,38 +99,37 @@ class gcode(object):
                 elif par_pos is not None:
                     if par_pos > sem_pos:
                         pos = par_pos
-                comment = line[pos+1:].strip()
                 line = line[0:pos]
 
             # we only try to simplify G1 coordinated moves
-            G = self.getCodeInt(line, 'G')
-            if G == 1:    #Move
-                x = self.getCodeFloat(line, 'X')
-                y = self.getCodeFloat(line, 'Y')
-                z = self.getCodeFloat(line, 'Z')
-                a = self.getCodeFloat(line, 'A')
-                f = self.getCodeFloat(line, 'F')
-                e = self.getCodeFloat(line, 'E')
+            G = self.get_code_int(line, 'G')
+            if G == 1:  # Move
+                x = self.get_code_float(line, 'X')
+                y = self.get_code_float(line, 'Y')
+                z = self.get_code_float(line, 'Z')
+                a = self.get_code_float(line, 'A')
+                f = self.get_code_float(line, 'F')
+                e = self.get_code_float(line, 'E')
 
                 if x is None and y is None and e is not None or f is not None:
-                  if len(line) > 0 and len(st) > 0:
-                    self.simplifyPath(st)
-                    st = []
+                    if len(line) > 0 and len(st) > 0:
+                        self.simplify_path(st)
+                        st = []
 
-                if x is None: 
+                if x is None:
                     x = lastx
-                if y is None: 
+                if y is None:
                     y = lasty
-                if z is None: 
+                if z is None:
                     z = lastz
-                if a is None: 
+                if a is None:
                     a = lasta
-                if f is None: 
+                if f is None:
                     f = lastf
-                if e is None: 
+                if e is None:
                     e = laste
 
-                st.append( [x,y,z,a,f,e] )
+                st.append([x, y, z, a, f, e])
 
                 lastx = x
                 lasty = y
@@ -141,95 +142,91 @@ class gcode(object):
                 # so we simplify them.
 
                 if G == 92:
-                    laste = self.getCodeFloat(line, 'E')
+                    laste = self.get_code_float(line, 'E')
                     self.preve = laste
 
-                if G == 0:    #Rapid - remember position
-                    x = self.getCodeFloat(line, 'X')
-                    y = self.getCodeFloat(line, 'Y')
-                    z = self.getCodeFloat(line, 'Z')
-                    a = self.getCodeFloat(line, 'A')
-                    f = self.getCodeFloat(line, 'F')
+                if G == 0:  # Rapid - remember position
+                    x = self.get_code_float(line, 'X')
+                    y = self.get_code_float(line, 'Y')
+                    z = self.get_code_float(line, 'Z')
+                    a = self.get_code_float(line, 'A')
+                    f = self.get_code_float(line, 'F')
 
-                    if x is not None: 
+                    if x is not None:
                         lastx = x
-                    if y is not None: 
+                    if y is not None:
                         lasty = y
-                    if z is not None: 
-                        lastz = z 
-                    if a is not None: 
+                    if z is not None:
+                        lastz = z
+                    if a is not None:
                         lasta = a
                     if f is not None:
                         lastf = f
 
                 if len(line) > 0 and len(st) > 0:
-                    self.simplifyPath(st)
+                    self.simplify_path(st)
                     st = []
-                output_line( original_line )
+                output_line(original_line)
                 self.output_line_count = self.output_line_count + 1
 
         if len(st) != 0:
-            self.simplifyPath(st)
+            self.simplify_path(st)
 
-        output_line( "; GCode file processed by " + sys.argv[0] )
-        output_line( "; Input Line Count = " + str(self.line_count) )
-        output_line( "; Output Line Count = " + str(self.output_line_count) )
+        output_line("; GCode file processed by " + sys.argv[0])
+        output_line("; Input Line Count = " + str(self.line_count))
+        output_line("; Output Line Count = " + str(self.output_line_count))
         if self.output_line_count < self.line_count:
-            output_line( "; Line reduction = " + str(100 * (self.line_count - self.output_line_count)/self.line_count) + "%" )
+            output_line(
+                "; Line reduction = " + str(100 * (self.line_count - self.output_line_count) / self.line_count) + "%")
 
-
-    def getCodeInt(self, line, code):
+    def get_code_int(self, line, code):
         if code not in self.regMatch:
             self.regMatch[code] = re.compile(code + '([^\s]+)', flags=re.IGNORECASE)
         m = self.regMatch[code].search(line)
-        if m == None:
+        if m is None:
             return None
         try:
             return int(m.group(1))
-        except:
+        except (IndexError, ValueError):
             return None
 
-
-    def getCodeFloat(self, line, code):
+    def get_code_float(self, line, code):
         if code not in self.regMatch:
             self.regMatch[code] = re.compile(code + '([^\s]+)', flags=re.IGNORECASE)
         m = self.regMatch[code].search(line)
-        if m == None:
+        if m is None:
             return None
         try:
             return float(m.group(1))
-        except:
+        except (IndexError, ValueError):
             return None
 
-    def simplifyPath(self, st):
-        #print "st=",len(st)
+    def simplify_path(self, st):
+        # print("st= %i" % len(st))
         l = douglas(st, plane=plane, tolerance=point_tolerance, length_tolerance=length_tolerance)
-        #print l
-        #print len(l)
         for i, (g, p, c) in enumerate(l):
             self.output_line_count = self.output_line_count + 1
-            #print "i, g,p,c=", i, g,p,c
             s = g + " "
             if p[0] is not None:
                 if p[0] is not self.prevx:
-                  s = s + "X{0:.3f}".format(p[0]) + " "
-                  self.prevx = p[0]
+                    s = s + "X{0:.3f}".format(p[0]) + " "
+                    self.prevx = p[0]
             if p[1] is not None:
                 if p[1] is not self.prevy:
-                  s = s + "Y{0:.3f}".format(p[1]) + " "
-                  self.prevy = p[1]
+                    s = s + "Y{0:.3f}".format(p[1]) + " "
+                    self.prevy = p[1]
             if p[2] is not None:
                 if p[2] != self.prevz:
-                  s = s + "Z{0:.3f}".format(p[2]) + " "
-                  self.prevz = p[2]
+                    s = s + "Z{0:.3f}".format(p[2]) + " "
+                    self.prevz = p[2]
             if p[3] is not None:
-              if p[3] is not self.preva:
-                  s = s + "A{0:.3f}".format(p[3]) + " "
-                  self.preva = p[3]
+                if p[3] is not self.preva:
+                    s = s + "A{0:.3f}".format(p[3]) + " "
+                    self.preva = p[3]
             if p[5] is not None:
-              if p[5] is not self.preve:
-                  s = s + "E{0:.5f}".format(p[5]) + " "
-                  self.preve = p[5]
+                if p[5] is not self.preve:
+                    s = s + "E{0:.5f}".format(p[5]) + " "
+                    self.preve = p[5]
             if p[4] is not None:
                 if p[4] is not self.prevf:
                     s = s + "F{0:.3f}".format(p[4]) + " "
@@ -237,7 +234,8 @@ class gcode(object):
             if c is not None:
                 s = s + c
             s = s.rstrip()
-            output_line( s )
+            output_line(s)
+
 
 # Check command line for file name
 if len(sys.argv) > 1:
@@ -245,11 +243,10 @@ if len(sys.argv) > 1:
     output_file = sys.argv[1]
     input_file = output_file + ".bak"
     if os.path.isfile(input_file):
-        os.remove( input_file )
-    os.rename( output_file, input_file )
-    gcode().load( input_file )
+        os.remove(input_file)
+    os.rename(output_file, input_file)
+    Gcode().load(input_file)
 
 else:
     # input is via stdin
-    gcode().loadList(fileinput.input())
-
+    Gcode().load_list(fileinput.input())
