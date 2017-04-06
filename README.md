@@ -3,8 +3,9 @@
 Processing script for making circles from segments.
 Converting g1 to g2/g3 commands.
 
-~~Needs python 2.7! Not worked with Python 3!~~
+~~Needs python 2.7! Not worked with Python 3!~~</br>
 Now work well with 3.6 at least.
+
 ##How to use
 
 **Attention!**
