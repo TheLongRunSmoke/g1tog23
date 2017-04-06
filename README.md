@@ -6,7 +6,7 @@ Converting g1 to g2/g3 commands.
 ~~Needs python 2.7! Not worked with Python 3!~~</br>
 Now work well with 3.6 at least.
 
-##How to use
+## How to use
 
 **Attention!**
 Don't forget quotes for paths containing spaces!
