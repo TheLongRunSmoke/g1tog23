@@ -25,10 +25,13 @@
 # Version 1.3
 # 	- Migerate to py3.x
 
-import fileinput
-import sys
-import re
 import os
+import re
+import sys
+
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QMainWindow, QProgressBar
+
 from author import douglas
 
 plane = 17
@@ -58,11 +61,14 @@ class Gcode(object):
         self.regMatch = {}
         self.line_count = 0
         self.output_line_count = 0
+        self.input_line_count = 0
         self._fileSize = None
 
     def load(self, filename):
         if os.path.isfile(filename):
             self._fileSize = os.stat(filename).st_size
+            with open(filename, 'r') as file:
+                self.input_line_count = sum(1 for line in file)
             gcodeFile = open(filename, 'r')
             self._load(gcodeFile)
             gcodeFile.close()
@@ -83,8 +89,8 @@ class Gcode(object):
         self.output_line_count = 0
 
         for line in gcode_file:
-
             self.line_count = self.line_count + 1
+            ui.set_progress(int(self.line_count/self.input_line_count*100))
             line = line.rstrip()
             original_line = line
             if type(line) is tuple:
@@ -237,16 +243,44 @@ class Gcode(object):
             output_line(s)
 
 
-# Check command line for file name
-if len(sys.argv) > 1:
-    # input is file name
-    output_file = sys.argv[1]
-    input_file = output_file + ".bak"
+class GUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.pbar = QProgressBar(self)
+        self.set_closable()
+        self.setWindowTitle('G1toG23')
+        self.show()
+
+    def set_unclosable(self):
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.WindowSystemMenuHint)
+
+    def set_closable(self):
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.WindowCloseButtonHint)
+
+    def set_progress(self, progress):
+        if 0 <= progress <= 100:
+            self.pbar.setValue(progress)
+
+
+def process(output):
+    """
+    Process input file if specifed.
+    """
+    input_file = output + ".bak"
     if os.path.isfile(input_file):
         os.remove(input_file)
-    os.rename(output_file, input_file)
+    os.rename(output, input_file)
     Gcode().load(input_file)
+    # ui.close()
+    # else:
+    # ui.close()
 
-else:
-    # input is via stdin
-    Gcode().load_list(fileinput.input())
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ui = GUI()
+    if len(sys.argv) > 1:
+        # ui.set_unclosable()
+        output_file = sys.argv[1]
+        process(output_file)  # Not best practice, will refactor later.
+    sys.exit(app.exec_())
