@@ -28,6 +28,9 @@
 # 	- UI added.
 
 import os
+import pathlib
+os.chdir(str(pathlib.Path(os.getcwd()).parent))    # Simplify3D support, it's have qt dlls in work folder, just go away.
+
 import re
 import sys
 
@@ -41,7 +44,7 @@ from author import douglas
 class Gcode(object):
     # Douglas-Peucker simplification pref
     plane = 17
-    point_tolerance = 0.05
+    point_tolerance = 0.01
     length_tolerance = 0.005
 
     prevx = 0

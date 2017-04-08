@@ -3,8 +3,15 @@
 Processing script for making circles from segments.
 Converting g1 to g2/g3 commands.
 
-~~Needs python 2.7! Not worked with Python 3!~~</br>
-**Now work with Python 3.x.**
+## What's news
+
+**v1.4**
+ * UI added.
+ 
+
+**v1.3**
+ * Migrate to Python3.
+ * Windows binaries available.
 
 ## Install
 
@@ -19,6 +26,10 @@ Or use source by follow.
  
 1. Clone or download script.
 2. Install Python, if you don't have it all ready.
+3. Install requared lib:
+```
+pip install pyqt5
+```
 
 ## How to use
 
