@@ -22,8 +22,8 @@
 #
 
 import math
-import sys
 import os
+import sys
 
 
 def log(*args):

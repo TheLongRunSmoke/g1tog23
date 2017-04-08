@@ -24,32 +24,26 @@
 # 	- Adding E argument and calculation for E, ignoring not changed positions
 # Version 1.3
 # 	- Migerate to py3.x
+# Version 1.4
+# 	- UI added.
 
 import os
 import re
 import sys
 
 from PyQt5 import QtCore
+from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QProgressBar
 
 from author import douglas
 
-plane = 17
-point_tolerance = 0.05
-length_tolerance = 0.005
-
-output_file = ""
-
-
-def output_line(s):
-    if output_file == "":
-        print(s)
-    else:
-        with open(output_file, "a") as myfile:
-            myfile.write(s + "\n")
-
 
 class Gcode(object):
+    # Douglas-Peucker simplification pref
+    plane = 17
+    point_tolerance = 0.05
+    length_tolerance = 0.005
+
     prevx = 0
     prevy = 0
     prevz = 0
@@ -57,27 +51,30 @@ class Gcode(object):
     prevf = 0
     preve = 0
 
-    def __init__(self):
+    def __init__(self, callback):
         self.regMatch = {}
+        self.output_file = ""
         self.line_count = 0
         self.output_line_count = 0
         self.input_line_count = 0
         self._fileSize = None
+        self.callback = callback
 
-    def load(self, filename):
-        if os.path.isfile(filename):
-            self._fileSize = os.stat(filename).st_size
-            with open(filename, 'r') as file:
+    def load(self, input_file, output_file):
+        if os.path.isfile(input_file):
+            self._fileSize = os.stat(input_file).st_size
+            self.output_file = output_file
+            with open(input_file, 'r') as file:
                 self.input_line_count = sum(1 for line in file)
-            gcodeFile = open(filename, 'r')
+            gcodeFile = open(input_file, 'r')
             self._load(gcodeFile)
             gcodeFile.close()
+            self.callback(-1)
 
     def load_list(self, l):
         self._load(l)
 
     def _load(self, gcode_file):
-
         st = []
         lastx = 0
         lasty = 0
@@ -90,7 +87,7 @@ class Gcode(object):
 
         for line in gcode_file:
             self.line_count = self.line_count + 1
-            ui.set_progress(int(self.line_count/self.input_line_count*100))
+            self.callback(int(self.line_count / self.input_line_count * 100))
             line = line.rstrip()
             original_line = line
             if type(line) is tuple:
@@ -172,18 +169,25 @@ class Gcode(object):
                 if len(line) > 0 and len(st) > 0:
                     self.simplify_path(st)
                     st = []
-                output_line(original_line)
+                self.output_line(original_line)
                 self.output_line_count = self.output_line_count + 1
 
         if len(st) != 0:
             self.simplify_path(st)
 
-        output_line("; GCode file processed by " + sys.argv[0])
-        output_line("; Input Line Count = " + str(self.line_count))
-        output_line("; Output Line Count = " + str(self.output_line_count))
+        self.output_line("; GCode file processed by " + sys.argv[0])
+        self.output_line("; Input Line Count = " + str(self.line_count))
+        self.output_line("; Output Line Count = " + str(self.output_line_count))
         if self.output_line_count < self.line_count:
-            output_line(
+            self.output_line(
                 "; Line reduction = " + str(100 * (self.line_count - self.output_line_count) / self.line_count) + "%")
+
+    def output_line(self, s):
+        if self.output_file == "":
+            print(s)
+        else:
+            with open(self.output_file, "a") as myfile:
+                myfile.write(s + "\n")
 
     def get_code_int(self, line, code):
         if code not in self.regMatch:
@@ -209,7 +213,7 @@ class Gcode(object):
 
     def simplify_path(self, st):
         # print("st= %i" % len(st))
-        l = douglas(st, plane=plane, tolerance=point_tolerance, length_tolerance=length_tolerance)
+        l = douglas(st, plane=self.plane, tolerance=self.point_tolerance, length_tolerance=self.length_tolerance)
         for i, (g, p, c) in enumerate(l):
             self.output_line_count = self.output_line_count + 1
             s = g + " "
@@ -240,47 +244,68 @@ class Gcode(object):
             if c is not None:
                 s = s + c
             s = s.rstrip()
-            output_line(s)
+            self.output_line(s)
+
+
+class ProcessThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal(int)
+
+    def __init__(self, filename):
+        QtCore.QThread.__init__(self)
+        self.output_file = filename
+
+    def run(self):
+        """
+            Process input file if specifed.
+        """
+        input_file = self.output_file + ".bak"
+        try:
+            if os.path.isfile(input_file):
+                os.remove(input_file)
+            os.rename(self.output_file, input_file)
+        except FileNotFoundError:
+            print("File not found %s" % self.output_file)
+            return
+        Gcode(self.callback).load(input_file, self.output_file)
+
+    def callback(self, progress):
+            self.signal.emit(progress)
 
 
 class GUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, argv):
         super().__init__()
+        self.threads = []
+        self.resize(300, 35)
         self.pbar = QProgressBar(self)
+        self.setCentralWidget(self.pbar)
         self.set_closable()
         self.setWindowTitle('G1toG23')
         self.show()
-
-    def set_unclosable(self):
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.WindowSystemMenuHint)
+        if len(argv) > 1:
+            output_file = sys.argv[1]
+            self.run_process_thread(output_file)
+        else:
+            print("File not specifed. Use g1tog23.py <gcode file>.")
 
     def set_closable(self):
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.WindowCloseButtonHint)
 
+    def run_process_thread(self, file):
+        processor = ProcessThread(file)
+        processor.signal.connect(self.set_progress)
+        self.threads.append(processor)
+        processor.start()
+
+    @pyqtSlot(int)
     def set_progress(self, progress):
         if 0 <= progress <= 100:
             self.pbar.setValue(progress)
-
-
-def process(output):
-    """
-    Process input file if specifed.
-    """
-    input_file = output + ".bak"
-    if os.path.isfile(input_file):
-        os.remove(input_file)
-    os.rename(output, input_file)
-    Gcode().load(input_file)
-    # ui.close()
-    # else:
-    # ui.close()
-
+        else:
+            self.close()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ui = GUI()
-    if len(sys.argv) > 1:
-        # ui.set_unclosable()
-        output_file = sys.argv[1]
-        process(output_file)  # Not best practice, will refactor later.
+    app.setStyle("fusion")
+    ui = GUI(sys.argv)
     sys.exit(app.exec_())
