@@ -6,6 +6,7 @@ Converting g1 to g2/g3 commands.
 ## What's news
 
 **v1.4**
+ * Accuracy is slightly increased.
  * UI added.
  
 
@@ -17,7 +18,7 @@ Converting g1 to g2/g3 commands.
 
 #### **Windows only**
  
-1. [**Download**](https://github.com/TheLongRunSmoke/g1tog23/releases) binaries in release section.
+1. [**Download**](https://github.com/TheLongRunSmoke/g1tog23/releases) binaries from release section.
 2. Unpack rar somewhere.
 
 Or use source by follow.
